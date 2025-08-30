@@ -181,9 +181,69 @@
     <li><code>NET <xsl:value-of select="tt:class"/>.<xsl:value-of select="tt:name"/>(<xsl:call-template name="join-params"><xsl:with-param name="ctx" select="."/></xsl:call-template>)</code></li>
   </xsl:template>
 
-  <xsl:template match="tt:wait" mode="step">
-    <li><code>WAIT <xsl:value-of select="normalize-space(tt:time/tt:value/tt:const)"/> <xsl:value-of select="normalize-space(tt:time/tt:unit)"/></code></li>
-  </xsl:template>
+	<!-- WAIT (const or variable; resolves local def first, then global) -->
+	<xsl:template match="tt:wait" mode="step">
+	  <!-- Unit (ms/s/…) -->
+	  <xsl:variable name="unit" select="normalize-space(tt:time/tt:unit)"/>
+
+	  <!-- Direct constant -->
+	  <xsl:variable name="valConst" select="normalize-space(tt:time/tt:value/tt:const)"/>
+
+	  <!-- Variable name from common shapes -->
+	  <xsl:variable name="valVarName">
+		<xsl:choose>
+		  <xsl:when test="normalize-space(tt:time/tt:value/tt:variable/tt:name)!=''">
+			<xsl:value-of select="normalize-space(tt:time/tt:value/tt:variable/tt:name)"/>
+		  </xsl:when>
+		  <xsl:otherwise>
+			<xsl:value-of select="normalize-space(tt:time/tt:value/tt:variable)"/>
+		  </xsl:otherwise>
+		</xsl:choose>
+	  </xsl:variable>
+
+	  <!-- Find the current test case/definition node -->
+	  <xsl:variable name="tc" select="(ancestor::tt:tc | ancestor::tt:tc_definition)[last()]"/>
+
+	  <!-- Resolve const from a LOCAL definition (inside this tc), else GLOBAL -->
+	  <xsl:variable name="defConstLocal"
+		select="normalize-space($tc//tt:variables/tt:variable_definition
+								   [normalize-space(tt:name)=$valVarName]
+								   [last()]/tt:source/tt:value/tt:const)"/>
+	  <xsl:variable name="defConstGlobal"
+		select="normalize-space(//tt:variable_definition
+								   [normalize-space(tt:name)=$valVarName]
+								   [1]/tt:source/tt:value/tt:const)"/>
+	  <xsl:variable name="defConst">
+		<xsl:choose>
+		  <xsl:when test="$defConstLocal!=''"><xsl:value-of select="$defConstLocal"/></xsl:when>
+		  <xsl:otherwise><xsl:value-of select="$defConstGlobal"/></xsl:otherwise>
+		</xsl:choose>
+	  </xsl:variable>
+
+	  <li>
+		<code>WAIT
+		  <xsl:text> </xsl:text>
+		  <xsl:choose>
+			<xsl:when test="$valConst!=''">
+			  <xsl:value-of select="$valConst"/>
+			</xsl:when>
+			<xsl:when test="$valVarName!=''">
+			  <xsl:text>$</xsl:text><xsl:value-of select="$valVarName"/>
+			  <xsl:if test="$defConst!=''">
+				<xsl:text> (</xsl:text><xsl:value-of select="$defConst"/><xsl:text>)</xsl:text>
+			  </xsl:if>
+			</xsl:when>
+			<xsl:otherwise>?</xsl:otherwise>
+		  </xsl:choose>
+		  <xsl:if test="$unit!=''">
+			<xsl:text> </xsl:text><xsl:value-of select="$unit"/>
+		  </xsl:if>
+		</code>
+	  </li>
+	</xsl:template>
+
+
+
 
   <xsl:template match="tt:set" mode="step">
     <li><code>SET </code><code>
@@ -444,6 +504,36 @@
 	  </li>
 	</xsl:template>
 
+	<!-- COMMENT -->
+	<xsl:template match="tt:comment" mode="step">
+	  <xsl:param name="indent"/>
+	  <xsl:variable name="msg">
+		<xsl:choose>
+		  <xsl:when test="normalize-space(tt:text)!=''">
+			<xsl:value-of select="normalize-space(tt:text)"/>
+		  </xsl:when>
+		  <xsl:when test="normalize-space(tt:title)!=''">
+			<xsl:value-of select="normalize-space(tt:title)"/>
+		  </xsl:when>
+		  <xsl:when test="normalize-space(tt:message)!=''">
+			<xsl:value-of select="normalize-space(tt:message)"/>
+		  </xsl:when>
+		  <xsl:when test="normalize-space(.//tt:value/tt:const)!=''">
+			<xsl:value-of select="normalize-space(.//tt:value/tt:const)"/>
+		  </xsl:when>
+		  <xsl:otherwise>
+			<xsl:value-of select="normalize-space(string(.))"/>
+		  </xsl:otherwise>
+		</xsl:choose>
+	  </xsl:variable>
+
+	  <li>
+		<code>COMMENT</code>
+		<xsl:if test="$msg!=''">
+		  <span class="muted"> — <xsl:value-of select="$msg"/></span>
+		</xsl:if>
+	  </li>
+	</xsl:template>
 
 
 
