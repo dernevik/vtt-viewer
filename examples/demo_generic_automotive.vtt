@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt:tt xmlns:tt="http://www.vector-informatik.de/ITE/TestTable/1.0">
+
+  <!-- =====================  Fixture 1  ===================== -->
+  <tt:tf>
+    <tt:title>Power_Sleep_Management</tt:title>
+
+    <!-- Fixture Preparation -->
+    <tt:preparation>
+      <tt:ttfunction><tt:name>Power_OFF</tt:name></tt:ttfunction>
+      <tt:wait><tt:time><tt:value><tt:const>3000</tt:const></tt:value><tt:unit>ms</tt:unit></tt:time></tt:wait>
+      <tt:ttfunction><tt:name>Power_ON</tt:name></tt:ttfunction>
+    </tt:preparation>
+
+    <!-- Test case: enter sleep & check -->
+    <tt:tc>
+      <tt:title>Enter Sleep And Verify</tt:title>
+      <tt:tcid>11111111-2222-3333-4444-555555555555</tt:tcid>
+
+      <tt:preparation>
+        <tt:set>
+          <tt:in>
+            <tt:assignment>
+              <tt:sink><tt:dbobject>SysVar_BEGIN_OF_OBJECT|1|VehiclePower|IgnitionStatus|END_OF_OBJECT_SysVar</tt:dbobject></tt:sink>
+              <tt:source><tt:value><tt:const>On</tt:const></tt:value></tt:source>
+            </tt:assignment>
+          </tt:in>
+        </tt:set>
+        <tt:wait><tt:time><tt:value><tt:const>1000</tt:const></tt:value><tt:unit>ms</tt:unit></tt:time></tt:wait>
+      </tt:preparation>
+
+      <!-- STATECHANGE with IN / WAIT / EXPECTED -->
+      <tt:statechange>
+        <tt:title>Request Sleep</tt:title>
+        <tt:in>
+          <tt:assignment>
+            <tt:sink><tt:dbobject>SysVar_BEGIN_OF_OBJECT|1|CAN_All|HilStatus::CAN::Reset|END_OF_OBJECT_SysVar</tt:dbobject></tt:sink>
+            <tt:source><tt:value><tt:const>1</tt:const></tt:value></tt:source>
+          </tt:assignment>
+        </tt:in>
+        <tt:wait><tt:time><tt:value><tt:const>100</tt:const></tt:value><tt:unit>ms</tt:unit></tt:time></tt:wait>
+        <tt:expected>
+          <tt:compare>
+            <tt:eq>
+              <tt:dbobject>DBSignal_BEGIN_OF_OBJECT|1|BodyCAN|VehicleState_SleepActive|END_OF_OBJECT_DBSignal</tt:dbobject>
+              <tt:value><tt:const>1</tt:const></tt:value>
+            </tt:eq>
+          </tt:compare>
+        </tt:expected>
+      </tt:statechange>
+
+      <!-- Count a PDU while in sleep -->
+      <tt:occurrence_count>
+        <tt:title>SleepNotification PDUs</tt:title>
+        <tt:mincount>1</tt:mincount>
+        <tt:timeout><tt:value><tt:const>3000</tt:const></tt:value><tt:unit>ms</tt:unit></tt:timeout>
+        <tt:objects>
+          <tt:pdu><tt:dbobject>Pdu_BEGIN_OF_OBJECT|1|BodyCAN|SleepNotification|END_OF_OBJECT_Pdu</tt:dbobject></tt:pdu>
+        </tt:objects>
+      </tt:occurrence_count>
+
+      <tt:check_deactivation><tt:title>SleepNotification PDUs</tt:title></tt:check_deactivation>
+
+      <!-- CAPL call (external) -->
+      <tt:caplfunction><tt:name>wakeupCheckFor3Sec</tt:name></tt:caplfunction>
+
+      <!-- Wait for wakeup confirmation -->
+      <tt:awaitvaluematch>
+        <tt:timeout><tt:value><tt:const>2000</tt:const></tt:value><tt:unit>ms</tt:unit></tt:timeout>
+        <tt:compare>
+          <tt:eq>
+            <tt:dbobject>DBSignal_BEGIN_OF_OBJECT|1|BodyCAN|VehicleState_SleepActive|END_OF_OBJECT_DBSignal</tt:dbobject>
+            <tt:value><tt:const>0</tt:const></tt:value>
+          </tt:eq>
+        </tt:compare>
+      </tt:awaitvaluematch>
+
+      <!-- Inline CAPL note -->
+      <tt:caplinline>
+        <tt:title>Report</tt:title>
+        <tt:code>testStepPass("WakeupCheck", "Vehicle woke up as expected after 3 seconds.");</tt:code>
+      </tt:caplinline>
+
+      <tt:completion>
+        <tt:set>
+          <tt:in>
+            <tt:assignment>
+              <tt:sink><tt:dbobject>SysVar_BEGIN_OF_OBJECT|1|VehiclePower|IgnitionStatus|END_OF_OBJECT_SysVar</tt:dbobject></tt:sink>
+              <tt:source><tt:value><tt:const>Off</tt:const></tt:value></tt:source>
+            </tt:assignment>
+          </tt:in>
+        </tt:set>
+      </tt:completion>
+    </tt:tc>
+  </tt:tf>
+
+  <!-- =====================  Fixture 2  ===================== -->
+  <tt:tf>
+    <tt:title>Diagnostics_And_Communication</tt:title>
+
+    <!-- Fixture Preparation -->
+    <tt:preparation>
+      <tt:ttfunction><tt:name>Setup_Defaults</tt:name></tt:ttfunction>
+      <tt:wait><tt:time><tt:value><tt:const>500</tt:const></tt:value><tt:unit>ms</tt:unit></tt:time></tt:wait>
+    </tt:preparation>
+
+    <!-- Test case: simple diag + bus activity checks -->
+    <tt:tc>
+      <tt:title>Read Identification And Check Bus</tt:title>
+      <tt:tcid>aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</tt:tcid>
+
+      <tt:preparation>
+        <tt:variables>
+          <tt:variable_definition>
+            <tt:name>DiagTimeout_ms</tt:name>
+            <tt:type>int</tt:type>
+            <tt:source><tt:value><tt:const>2000</tt:const></tt:value></tt:source>
+          </tt:variable_definition>
+        </tt:variables>
+      </tt:preparation>
+
+      <!-- Diagnostic service line (free-form from VTT) -->
+      <tt:diagservice>
+        <tt:service>SID=0x22 DID=0xF190 (ReadDataByIdentifier)</tt:service>
+      </tt:diagservice>
+
+      <!-- Ensure no bus-off occurs for a while -->
+      <tt:awaitvaluematch>
+        <tt:timeout><tt:value><tt:const>1500</tt:const></tt:value><tt:unit>ms</tt:unit></tt:timeout>
+        <tt:compare>
+          <tt:eq>
+            <tt:dbobject>DBSignal_BEGIN_OF_OBJECT|1|BodyCAN|BusOffCounter|END_OF_OBJECT_DBSignal</tt:dbobject>
+            <tt:value><tt:const>0</tt:const></tt:value>
+          </tt:eq>
+        </tt:compare>
+      </tt:awaitvaluematch>
+
+      <!-- Watch for a specific PDU burst -->
+      <tt:occurrence_count>
+        <tt:title>DiagResponse Frames</tt:title>
+        <tt:mincount>1</tt:mincount>
+        <tt:timeout><tt:value><tt:const>1000</tt:const></tt:value><tt:unit>ms</tt:unit></tt:timeout>
+        <tt:objects>
+          <tt:pdu><tt:dbobject>Pdu_BEGIN_OF_OBJECT|1|BodyCAN|DiagResponse|END_OF_OBJECT_Pdu</tt:dbobject></tt:pdu>
+        </tt:objects>
+      </tt:occurrence_count>
+
+      <tt:check_deactivation><tt:title>DiagResponse Frames</tt:title></tt:check_deactivation>
+
+      <tt:caplinline>
+        <tt:title>Annotate</tt:title>
+        <tt:code>testStepPass("DiagCheck", "Identification read and bus healthy.");</tt:code>
+      </tt:caplinline>
+    </tt:tc>
+  </tt:tf>
+
+</tt:tt>
