@@ -80,6 +80,71 @@ reload current session (or open a new terminal)
 ```
 . $PROFILE
 ```
+## List fixtures quickly (PowerShell profile helper)
+
+Add a small helper to your PowerShell profile so you can list fixture names from any .vtt.
+
+Open your profile:
+```
+notepad $PROFILE
+```
+(create the file if it doesn’t exist)
+
+Paste ONE of the versions below and save.
+
+Version A (original):
+```
+function Get-VttFixtures {
+param([Parameter(Mandatory)][string]$Path)
+$Path = (Resolve-Path $Path).Path
+[xml]$doc = Get-Content -LiteralPath $Path -Raw
+$ns = New-Object System.Xml.XmlNamespaceManager($doc.NameTable)
+$ns.AddNamespace('tt','http://www.vector-informatik.de/ITE/TestTable/1.0
+') | Out-Null
+$doc.SelectNodes('//tt:tf/tt:title', $ns) |
+ForEach-Object { $_.InnerText } |
+Sort-Object -Unique
+}
+Set-Alias vttf Get-VttFixtures
+```
+Version B (shorter; uses Select-Xml):
+```
+function Get-VttFixtures {
+param([Parameter(Mandatory)][string]$Path)
+$ns = @{ tt = 'http://www.vector-informatik.de/ITE/TestTable/1.0
+' }
+Select-Xml -Path $Path -XPath '//tt:tf/tt:title' -Namespace $ns |
+ForEach-Object { $_.Node.InnerText } |
+Sort-Object -Unique
+}
+Set-Alias vttf Get-VttFixtures
+```
+
+Reload your profile (or open a new terminal):
+```
+. $PROFILE
+```
+
+### Usage examples:
+List fixtures:
+```
+vttf .\your.vtt
+```
+Copy list to clipboard:
+```
+vttf .\your.vtt | clip
+```
+Use a fixture from the list (remember to quote names with spaces or punctuation):
+```
+vtt .\your.vtt -Fixture "Diagnostics And Communication"
+vtt .\your.vtt -Fixture "ECUReset (11)"
+```
+
+Works with large .vtt files; both versions load once and query titles.
+
+The namespace URI must be exactly:
+http://www.vector-informatik.de/ITE/TestTable/1.0
+
 
 ## Usage
 
