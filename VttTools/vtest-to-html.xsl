@@ -9,6 +9,11 @@
   <!-- Optional filter: fixture title (exact match) -->
   <xsl:param name="fixture" select="''"/>
 
+<xsl:param name="showStepNumbers" select="'false'"/>
+<xsl:param name="showActiveFlag"  select="'false'"/>
+<xsl:param name="softenPaths"     select="'true'"/>
+
+
   <!-- Join function/step parameters -->
   <xsl:template name="join-params">
     <xsl:param name="ctx"/>
@@ -22,6 +27,115 @@
       </xsl:choose>
     </xsl:for-each>
   </xsl:template>
+  
+  <!-- Keys for fast lookups -->
+	<xsl:key name="tc-by-id"   match="tt:tc|tt:tc_definition|*[@tcid]" use="normalize-space(tt:tcid|@tcid)"/>
+	<xsl:key name="tc-by-name" match="tt:tc|tt:tc_definition|*[*[local-name()='title' or local-name()='name']]" 
+			 use="normalize-space(tt:title|tt:name|*[local-name()='title']|*[local-name()='name'])"/>
+	<xsl:key name="fn-by-name" match="*[*[local-name()='name']]" 
+			 use="normalize-space(*[local-name()='name'])"/>
+	<xsl:key name="var-by-name" match="*[(local-name()='variable_definition')]" 
+			 use="normalize-space(*[local-name()='name'])"/>
+			 
+	<!-- Return a display label for a value node:
+		 - const → the const
+		 - variable → $VarName (ResolvedConst)  [if a simple const can be resolved]
+		 - otherwise → compact string(.) -->
+	<xsl:template name="bestValueLabel">
+	  <xsl:param name="ctx"/>
+
+	  <!-- Direct constant under the ctx -->
+	  <xsl:variable name="const" select="normalize-space($ctx/*[local-name()='const'])"/>
+
+	  <!-- Variable name under the ctx -->
+	  <xsl:variable name="varName">
+		<xsl:choose>
+		  <xsl:when test="normalize-space($ctx/*[local-name()='variable']/*[local-name()='name'])!=''">
+			<xsl:value-of select="normalize-space($ctx/*[local-name()='variable']/*[local-name()='name'])"/>
+		  </xsl:when>
+		  <xsl:otherwise>
+			<xsl:value-of select="normalize-space($ctx/*[local-name()='variable'])"/>
+		  </xsl:otherwise>
+		</xsl:choose>
+	  </xsl:variable>
+
+	  <!-- Current test case/definition (for local variable resolution) -->
+	  <xsl:variable name="tc"
+		select="(ancestor::tt:tc | ancestor::tt:tc_definition |
+				 ancestor::*[local-name()='tc' or local-name()='tc_definition'])[last()]"/>
+
+	  <!-- Try local definition first, then global (using the key you already defined) -->
+	  <xsl:variable name="localConst"
+		select="normalize-space($tc//*[local-name()='variable_definition']
+					  [normalize-space(*[local-name()='name'])=$varName]
+					  [last()]/*[local-name()='source']/*[local-name()='value']/*[local-name()='const'])"/>
+
+	  <xsl:variable name="globalConst"
+		select="normalize-space((key('var-by-name',$varName))[1]
+					  /*[local-name()='source']/*[local-name()='value']/*[local-name()='const'])"/>
+
+	  <xsl:variable name="resolved">
+		<xsl:choose>
+		  <xsl:when test="$localConst!=''">
+			<xsl:value-of select="$localConst"/>
+		  </xsl:when>
+		  <xsl:otherwise>
+			<xsl:value-of select="$globalConst"/>
+		  </xsl:otherwise>
+		</xsl:choose>
+	  </xsl:variable>
+
+	  <!-- Emit the label -->
+	  <xsl:choose>
+		<xsl:when test="$const!=''">
+		  <xsl:value-of select="$const"/>
+		</xsl:when>
+		<xsl:when test="$varName!=''">
+		  <xsl:text>$</xsl:text><xsl:value-of select="$varName"/>
+		  <xsl:if test="$resolved!=''">
+			<xsl:text> (</xsl:text><xsl:value-of select="$resolved"/><xsl:text>)</xsl:text>
+		  </xsl:if>
+		</xsl:when>
+		<xsl:otherwise>
+		  <xsl:value-of select="normalize-space(string($ctx))"/>
+		</xsl:otherwise>
+	  </xsl:choose>
+	</xsl:template>
+	
+	
+	<!-- Helper: print one WAIT line from a time/timeout 'base' node -->
+<xsl:template name="emit-wait-line">
+  <xsl:param name="base"/>
+
+  <xsl:variable name="unit" select="normalize-space(($base//*[local-name()='unit'])[1])"/>
+  <xsl:variable name="cval" select="normalize-space(($base//*[local-name()='const'])[1])"/>
+
+  <xsl:variable name="display">
+    <xsl:choose>
+      <xsl:when test="$cval!=''">
+        <xsl:value-of select="$cval"/>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:call-template name="bestValueLabel">
+          <xsl:with-param name="ctx" select="($base//*[local-name()='value'])[1]"/>
+        </xsl:call-template>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:variable>
+
+  <li>
+    <code>
+      <xsl:text>WAIT </xsl:text>
+      <xsl:value-of select="$display"/>
+      <xsl:if test="$unit!=''">
+        <xsl:text> </xsl:text>     <!-- explicit space, never collapsed by XSLT -->
+        <xsl:value-of select="$unit"/>
+      </xsl:if>
+    </code>
+  </li>
+</xsl:template>
+
+
 
   <!-- ========== Root ========== -->
   <xsl:template match="/">
@@ -80,29 +194,30 @@
     <ul><xsl:apply-templates select="tt:tttestcase"/></ul>
   </xsl:template>
 
+  
   <xsl:template match="tt:tttestcase">
-    <xsl:variable name="id"   select="normalize-space(tt:tcid)"/>
-    <xsl:variable name="name" select="normalize-space(tt:name)"/>
+	  <xsl:variable name="id"   select="normalize-space(tt:tcid)"/>
+	  <xsl:variable name="name" select="normalize-space(tt:name)"/>
 
-    <xsl:variable name="byId"
-      select="(//tt:tc[normalize-space(tt:tcid)=$id] |
-               //tt:tc_definition[normalize-space(tt:tcid)=$id])[1]"/>
-    <xsl:variable name="byName"
-      select="(//tt:tc[normalize-space(tt:title)=$name] |
-               //tt:tc_definition[normalize-space(tt:name)=$name])[1]"/>
+	  <xsl:variable name="byId"   select="(key('tc-by-id', $id))[1]"/>
+	  <xsl:variable name="byName" select="(key('tc-by-name', $name))[1]"/>
 
-    <li>
-      <code>
-        <xsl:value-of select="$name"/>
-        <xsl:if test="$id!=''"> [<xsl:value-of select="$id"/>]</xsl:if>
-      </code>
-      <xsl:choose>
-        <xsl:when test="$byId"><ul><xsl:apply-templates select="$byId" mode="inline"/></ul></xsl:when>
-        <xsl:when test="$byName"><span class="muted"> — matched by name</span><ul><xsl:apply-templates select="$byName" mode="inline"/></ul></xsl:when>
-        <xsl:otherwise><span class="muted"> — definition not found</span></xsl:otherwise>
-      </xsl:choose>
-    </li>
-  </xsl:template>
+	  <li>
+		<code>
+		  <xsl:value-of select="$name"/>
+		  <xsl:if test="$id!=''"> [<xsl:value-of select="$id"/>]</xsl:if>
+		</code>
+		<xsl:choose>
+		  <xsl:when test="$byId"><ul><xsl:apply-templates select="$byId" mode="inline"/></ul></xsl:when>
+		  <xsl:when test="$byName"><span class="muted"> — matched by name</span><ul><xsl:apply-templates select="$byName" mode="inline"/></ul></xsl:when>
+		  <xsl:otherwise><span class="muted"> — definition not found</span></xsl:otherwise>
+		</xsl:choose>
+	  </li>
+	</xsl:template>
+
+  
+  
+  
 
   <!-- Inline expansion for tc / tc_definition -->
   <xsl:template match="tt:tc | tt:tc_definition" mode="inline">
@@ -148,137 +263,130 @@
   </xsl:template>
 
   <!-- ========== Step renderers ========== -->
-  <xsl:template match="tt:ttfunction" mode="step">
-    <li><code>TTFUNC <xsl:value-of select="tt:name"/>(<xsl:call-template name="join-params"><xsl:with-param name="ctx" select="."/></xsl:call-template>)</code></li>
-  </xsl:template>
+	<!-- TTFUNC call: print call; inline body if a same-file definition exists -->
+	<xsl:template match="tt:ttfunction" mode="step">
+	  <xsl:param name="indent"/>
+	  <xsl:variable name="fname" select="normalize-space(tt:name)"/>
 
-  <!-- CAPL call with best-effort source hint -->
-	<xsl:template match="tt:caplfunction" mode="step">
 	  <li>
-		<code>CAPL <xsl:value-of select="tt:name"/>(<xsl:call-template name="join-params">
-		  <xsl:with-param name="ctx" select="."/>
-		</xsl:call-template>)</code>
-		<!-- try a few common places a path might appear -->
-		<xsl:variable name="src"
-		  select="normalize-space((
-			tt:file/tt:path |
-			tt:sourcefile |
-			tt:impl/tt:capl/tt:path |
-			@file | @path
-		  )[1])"/>
+		<code>TTFUNC <xsl:value-of select="$fname"/>(</code>
+		<xsl:for-each select="tt:param">
+		  <xsl:if test="position() &gt; 1"><xsl:text>, </xsl:text></xsl:if>
+		  <code>
+			<xsl:call-template name="bestValueLabel">
+			  <xsl:with-param name="ctx" select="tt:value"/>
+			</xsl:call-template>
+		  </code>
+		</xsl:for-each>
+
+		<code>)</code>
+
+		<!-- Find a likely definition node elsewhere in the file.
+			 A) any element with child <name> == $fname (namespace-agnostic), or
+			 B) an element whose local-name() equals the function name,
+			 and which has step-like descendants. -->
+		<xsl:variable name="def"
+		  select="(
+			//*[
+			  *[local-name()='name' and normalize-space(.)=$fname]
+			  and (descendant::*[local-name()='set']
+				   or descendant::*[local-name()='wait']
+				   or descendant::*[local-name()='statechange']
+				   or descendant::*[local-name()='statecheck']
+				   or descendant::*[local-name()='variables']
+				   or descendant::*[local-name()='caplfunction']
+				   or descendant::*[local-name()='caplinline']
+				   or descendant::*[local-name()='occurrence_count']
+				   or descendant::*[local-name()='check_deactivation']
+				   or descendant::*[local-name()='awaitvaluematch']
+				   or descendant::*[local-name()='ttfunction']
+				   or descendant::*[local-name()='netfunction']
+				   or descendant::*[local-name()='diagservice']
+			  )
+			  and not(self::tt:ttfunction)
+			]
+			|
+			//*[
+			  local-name()=$fname
+			  and (descendant::*[local-name()='set'] or descendant::*[local-name()='wait'])
+			]
+		  )[1]"/>
+
 		<xsl:choose>
-		  <xsl:when test="$src!=''">
-			<span class="muted"> — file <code><xsl:value-of select="$src"/></code></span>
+		  <xsl:when test="$def">
+			<span class="muted"> — inlined</span>
+			<ul>
+			  <!-- Render the definition’s content; skip meta -->
+			  <xsl:apply-templates select="$def/*[
+				not(local-name()='name' or local-name()='parameters' or
+					local-name()='title' or local-name()='attributes' or
+					local-name()='arguments' or local-name()='description')
+			  ]" mode="step"/>
+			</ul>
 		  </xsl:when>
 		  <xsl:otherwise>
-			<span class="muted"> — external CAPL (path not in VTT)</span>
+			<span class="muted"> — definition not found (likely external)</span>
 		  </xsl:otherwise>
 		</xsl:choose>
 	  </li>
 	</xsl:template>
 
-  <xsl:template match="tt:netfunction" mode="step">
-    <li><code>NET <xsl:value-of select="tt:class"/>.<xsl:value-of select="tt:name"/>(<xsl:call-template name="join-params"><xsl:with-param name="ctx" select="."/></xsl:call-template>)</code></li>
-  </xsl:template>
 
-	<!-- WAIT (const or variable; resolves local def first, then global) -->
-	<xsl:template match="tt:wait" mode="step">
-	  <!-- Unit (ms/s/…) -->
-	  <xsl:variable name="unit" select="normalize-space(tt:time/tt:unit)"/>
+	  <xsl:template match="tt:netfunction" mode="step">
+		<li><code>NET <xsl:value-of select="tt:class"/>.<xsl:value-of select="tt:name"/>(<xsl:call-template name="join-params"><xsl:with-param name="ctx" select="."/></xsl:call-template>)</code></li>
+	  </xsl:template>
 
-	  <!-- Direct constant -->
-	  <xsl:variable name="valConst" select="normalize-space(tt:time/tt:value/tt:const)"/>
+		
 
-	  <!-- Variable name from common shapes -->
-	  <xsl:variable name="valVarName">
-		<xsl:choose>
-		  <xsl:when test="normalize-space(tt:time/tt:value/tt:variable/tt:name)!=''">
-			<xsl:value-of select="normalize-space(tt:time/tt:value/tt:variable/tt:name)"/>
-		  </xsl:when>
-		  <xsl:otherwise>
-			<xsl:value-of select="normalize-space(tt:time/tt:value/tt:variable)"/>
-		  </xsl:otherwise>
-		</xsl:choose>
-	  </xsl:variable>
 
-	  <!-- Find the current test case/definition node -->
-	  <xsl:variable name="tc" select="(ancestor::tt:tc | ancestor::tt:tc_definition)[last()]"/>
 
-	  <!-- Resolve const from a LOCAL definition (inside this tc), else GLOBAL -->
-	  <xsl:variable name="defConstLocal"
-		select="normalize-space($tc//tt:variables/tt:variable_definition
-								   [normalize-space(tt:name)=$valVarName]
-								   [last()]/tt:source/tt:value/tt:const)"/>
-	  <xsl:variable name="defConstGlobal"
-		select="normalize-space(//tt:variable_definition
-								   [normalize-space(tt:name)=$valVarName]
-								   [1]/tt:source/tt:value/tt:const)"/>
-	  <xsl:variable name="defConst">
-		<xsl:choose>
-		  <xsl:when test="$defConstLocal!=''"><xsl:value-of select="$defConstLocal"/></xsl:when>
-		  <xsl:otherwise><xsl:value-of select="$defConstGlobal"/></xsl:otherwise>
-		</xsl:choose>
-	  </xsl:variable>
 
+  <!-- SET (namespace-agnostic) -->
+	<xsl:template match="tt:set | *[local-name()='set']" mode="step">
 	  <li>
-		<code>WAIT
-		  <xsl:text> </xsl:text>
-		  <xsl:choose>
-			<xsl:when test="$valConst!=''">
-			  <xsl:value-of select="$valConst"/>
-			</xsl:when>
-			<xsl:when test="$valVarName!=''">
-			  <xsl:text>$</xsl:text><xsl:value-of select="$valVarName"/>
-			  <xsl:if test="$defConst!=''">
-				<xsl:text> (</xsl:text><xsl:value-of select="$defConst"/><xsl:text>)</xsl:text>
-			  </xsl:if>
-			</xsl:when>
-			<xsl:otherwise>?</xsl:otherwise>
-		  </xsl:choose>
-		  <xsl:if test="$unit!=''">
-			<xsl:text> </xsl:text><xsl:value-of select="$unit"/>
-		  </xsl:if>
-		</code>
+		<code>SET</code>
+		<ul>
+		  <xsl:for-each select="*[local-name()='in']/*[local-name()='assignment']">
+			<li>
+			  <code>
+				<xsl:value-of select="normalize-space(*[local-name()='sink']/*[local-name()='dbobject'])"/>
+				<xsl:text> = </xsl:text>
+				<xsl:choose>
+				  <xsl:when test="normalize-space(*[local-name()='source']/*[local-name()='value']/*[local-name()='const'])!=''">
+					<xsl:value-of select="normalize-space(*[local-name()='source']/*[local-name()='value']/*[local-name()='const'])"/>
+				  </xsl:when>
+				  <xsl:otherwise>
+					<xsl:value-of select="normalize-space(*[local-name()='source'])"/>
+				  </xsl:otherwise>
+				</xsl:choose>
+			  </code>
+			</li>
+		  </xsl:for-each>
+		</ul>
 	  </li>
 	</xsl:template>
-
-
-
-
-  <xsl:template match="tt:set" mode="step">
-    <li><code>SET </code><code>
-      <xsl:value-of select="normalize-space(tt:in/tt:assignment/tt:sink/tt:dbobject)"/>
-      <xsl:text> = </xsl:text>
-      <xsl:choose>
-        <xsl:when test="tt:in/tt:assignment/tt:source/tt:valuetable_entry"><xsl:value-of select="normalize-space(tt:in/tt:assignment/tt:source/tt:valuetable_entry)"/></xsl:when>
-        <xsl:otherwise><xsl:value-of select="normalize-space(tt:in/tt:assignment/tt:source/tt:value/tt:const)"/></xsl:otherwise>
-      </xsl:choose>
-    </code></li>
-  </xsl:template>
 
   <xsl:template match="tt:awaitvaluematch" mode="step">
-    <li>
-      <code>AWAITVALUEMATCH timeout=<xsl:value-of select="normalize-space(tt:timeout/tt:value/tt:const)"/><xsl:text> </xsl:text><xsl:value-of select="normalize-space(tt:timeout/tt:unit)"/></code>
-      <ul><xsl:apply-templates select="tt:compare" mode="step"/></ul>
-    </li>
-  </xsl:template>
+	  <li>
+		<code>AWAITVALUEMATCH timeout=</code>
+		<code>
+		  <xsl:call-template name="bestValueLabel">
+			<xsl:with-param name="ctx" select="tt:timeout/tt:value"/>
+		  </xsl:call-template>
+		  <xsl:if test="normalize-space(tt:timeout/tt:unit)!=''">
+			<xsl:text> </xsl:text><xsl:value-of select="normalize-space(tt:timeout/tt:unit)"/>
+		  </xsl:if>
+		</code>
+		<ul>
+		  <xsl:apply-templates select="tt:compare" mode="step"/>
+		</ul>
+	  </li>
+	</xsl:template>
 
-  <xsl:template match="tt:diagservice" mode="step">
-    <li><code>DIAG <xsl:value-of select="normalize-space(tt:service)"/></code></li>
-  </xsl:template>
+  
 
-  <xsl:template match="tt:for" mode="step">
-    <li>
-      <code>FOR <xsl:value-of select="normalize-space(tt:loopvar)"/> from <xsl:value-of select="normalize-space(tt:startvalue/tt:const)"/>
-      to <xsl:value-of select="normalize-space(tt:stopvalue/tt:const)"/> step <xsl:value-of select="normalize-space(tt:increment/tt:const)"/></code>
-      <ul>
-        <xsl:apply-templates select="tt:*[
-          not(self::tt:title or self::tt:loopvar or self::tt:loopvartype or
-              self::tt:startvalue or self::tt:stopvalue or self::tt:increment)
-        ]" mode="step"/>
-      </ul>
-    </li>
-  </xsl:template>
+
+
 
   <xsl:template match="tt:foreach" mode="step">
     <li>
@@ -292,67 +400,103 @@
   </xsl:template>
 
   <!-- ===== Composite: STATECHANGE ===== -->
-  <xsl:template match="tt:statechange" mode="step">
-    <li>
-      <code>STATECHANGE
-        <xsl:variable name="desc">
-          <xsl:choose>
-            <xsl:when test="normalize-space(tt:name)!=''"><xsl:value-of select="normalize-space(tt:name)"/></xsl:when>
-            <xsl:when test="normalize-space(tt:state)!=''"><xsl:value-of select="normalize-space(tt:state)"/></xsl:when>
-            <xsl:when test="normalize-space(tt:targetstate)!=''"><xsl:value-of select="normalize-space(tt:targetstate)"/></xsl:when>
-            <xsl:when test="normalize-space(tt:target)!=''"><xsl:value-of select="normalize-space(tt:target)"/></xsl:when>
-            <xsl:otherwise/>
-          </xsl:choose>
-        </xsl:variable>
-        <xsl:if test="normalize-space($desc)!=''"> <xsl:value-of select="$desc"/></xsl:if>
-      </code>
-      <ul><xsl:apply-templates select="tt:*" mode="step"/></ul>
-    </li>
-  </xsl:template>
 
-  <!-- STATECHANGE sections -->
-  <xsl:template match="tt:statechange/tt:title" mode="step">
-    <xsl:variable name="tNode" select="( @value | @text | .//tt:text | .//tt:value/tt:const | .//tt:const | .//text() )[1]"/>
-    <xsl:variable name="t" select="normalize-space(string($tNode))"/>
-    <xsl:if test="$t!=''"><li><em>TITLE</em>: <xsl:value-of select="$t"/></li></xsl:if>
-  </xsl:template>
+  <!-- STATECHANGE -->
+<xsl:template
+  match="tt:statechange
+       | *[local-name()='statechange'
+          or local-name()='stateChange']"
+  mode="step">
 
-  <xsl:template match="tt:statechange/tt:in" mode="step">
-    <li><code>IN</code><ul><xsl:apply-templates select="tt:*" mode="step"/></ul></li>
-  </xsl:template>
+  <li><strong>STATECHANGE</strong>
+    <ul>
+      <!-- IN -->
+      <xsl:if test="tt:in
+                 | *[local-name()='in']">
+        <li><em>IN</em>
+          <ul>
+            <xsl:apply-templates select="tt:in/* | *[local-name()='in']/*" mode="step"/>
+          </ul>
+        </li>
+      </xsl:if>
 
-  <xsl:template match="tt:statechange/tt:wait" mode="step">
-    <li><code>WAIT
-      <xsl:text> </xsl:text>
-      <xsl:choose>
-        <xsl:when test="tt:time">
-          <xsl:value-of select="normalize-space(tt:time/tt:value/tt:const)"/><xsl:text> </xsl:text>
-          <xsl:value-of select="normalize-space(tt:time/tt:unit)"/>
-        </xsl:when>
-        <xsl:when test="tt:value">
-          <xsl:value-of select="normalize-space(tt:value/tt:const)"/><xsl:text> </xsl:text>
-          <xsl:value-of select="normalize-space(tt:unit)"/>
-        </xsl:when>
-        <xsl:otherwise><xsl:value-of select="normalize-space(string(.))"/></xsl:otherwise>
-      </xsl:choose></code>
-    </li>
-  </xsl:template>
+	  
+	        <!-- WAIT: list any descendant <wait> or <timeout> and print value + unit -->
 
-  <xsl:template match="tt:statechange/tt:expected" mode="step">
-    <li><strong>EXPECTED</strong><ul><xsl:apply-templates select="tt:*" mode="step"/></ul></li>
-  </xsl:template>
+<xsl:variable name="waitNodes" select=".//*[local-name()='wait' or local-name()='timeout']"/>
+<xsl:if test="$waitNodes">
+  <li><em>WAIT</em>
+    <ul>
+      <xsl:for-each select="$waitNodes">
+        <xsl:variable name="base"
+          select="(.//*[local-name()='time' or local-name()='timeout']
+                  | self::node())[1]"/>
+        <xsl:call-template name="emit-wait-line">
+          <xsl:with-param name="base" select="$base"/>
+        </xsl:call-template>
+      </xsl:for-each>
+    </ul>
+  </li>
+</xsl:if>
 
-  <!-- ===== Composite: STATECHECK ===== -->
-  <xsl:template match="tt:statecheck" mode="step">
-    <li><code>STATECHECK</code><ul><xsl:apply-templates select="tt:*" mode="step"/></ul></li>
-  </xsl:template>
 
-  <xsl:template match="tt:statecheck/tt:title" mode="step">
-    <xsl:variable name="tNode" select="( @value | @text | .//tt:text | .//tt:value/tt:const | .//tt:const | .//text() )[1]"/>
-    <xsl:variable name="t" select="normalize-space(string($tNode))"/>
-    <xsl:if test="$t!=''"><li><em>TITLE</em>: <xsl:value-of select="$t"/></li></xsl:if>
-  </xsl:template>
 
+      <!-- EXPECTED -->
+      <xsl:if test="tt:expected
+                 | *[local-name()='expected']">
+        <li><em>EXPECTED</em>
+          <ul>
+            <xsl:apply-templates select="tt:expected/* | *[local-name()='expected']/*" mode="step"/>
+          </ul>
+        </li>
+      </xsl:if>
+    </ul>
+  </li>
+</xsl:template>
+
+	
+	
+	
+	<!-- STATECHECK -->
+	<xsl:template
+	  match="tt:statecheck
+		   | *[local-name()='statecheck'
+			  or local-name()='stateCheck']"
+	  mode="step">
+
+	  <li><strong>STATECHECK</strong>
+		<ul>
+		  <xsl:if test="normalize-space(tt:title | *[local-name()='title'])!=''">
+			<li><em>TITLE:</em>
+			  <xsl:text> </xsl:text>
+			  <code><xsl:value-of select="normalize-space(tt:title | *[local-name()='title'])"/></code>
+			</li>
+		  </xsl:if>
+
+		  <xsl:if test="tt:wait | *[local-name()='wait'] | tt:timeout | *[local-name()='timeout']">
+			<li><em>WAIT</em>
+			  <ul>
+				<xsl:apply-templates
+				  select="tt:wait | *[local-name()='wait'] | tt:timeout | *[local-name()='timeout']"
+				  mode="step"/>
+			  </ul>
+			</li>
+		  </xsl:if>
+
+		  <xsl:if test="tt:expected | *[local-name()='expected']">
+			<li><em>EXPECTED</em>
+			  <ul>
+				<xsl:apply-templates select="tt:expected/* | *[local-name()='expected']/*" mode="step"/>
+			  </ul>
+			</li>
+		  </xsl:if>
+		</ul>
+	  </li>
+	</xsl:template>
+
+
+  
+  
   <xsl:template match="tt:statecheck/tt:expected" mode="step">
     <li><strong>EXPECTED</strong><ul><xsl:apply-templates select="tt:*" mode="step"/></ul></li>
   </xsl:template>
@@ -535,13 +679,42 @@
 	  </li>
 	</xsl:template>
 
+	<!-- WAIT step -->
+	<xsl:template match="tt:wait | *[local-name()='wait']" mode="step">
+	  <xsl:variable name="base"
+		select="(.//*[local-name()='time' or local-name()='timeout']
+				| *[local-name()='time' or local-name()='timeout'])[1]"/>
+	  <xsl:if test="$base">
+		<xsl:call-template name="emit-wait-line">
+		  <xsl:with-param name="base" select="$base"/>
+		</xsl:call-template>
+	  </xsl:if>
+	</xsl:template>
+
+	<!-- TIMEOUT step (if your files ever use direct <timeout>) -->
+	<xsl:template match="tt:timeout | *[local-name()='timeout']" mode="step">
+	  <xsl:call-template name="emit-wait-line">
+		<xsl:with-param name="base" select="."/>
+	  </xsl:call-template>
+	</xsl:template>
+
+
 
 
 
   <!-- Fallback -->
   <xsl:template match="tt:*" mode="step">
-    <li><code><xsl:value-of select="translate(local-name(), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/></code></li>
+  <li>
+  <code><xsl:value-of select="translate(local-name(), 'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/></code>
+  <xsl:variable name="msg" select="normalize-space(./tt:text|./tt:title|./tt:message|./*[local-name()='text' or local-name()='title' or local-name()='message'])"/>
+  <xsl:if test="$msg!=''"><span class="muted"> — <xsl:value-of select="$msg"/></span></xsl:if>
+</li>
+
   </xsl:template>
   <xsl:template match="text()" mode="step"/>
+  
+  
+
+
 
 </xsl:stylesheet>
