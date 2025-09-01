@@ -12,7 +12,6 @@
 [] ACTIVE flag: decide: hide (default) or render once as metadata in TC header. (S)
 
 
-
 # Reviewer UX / output polish
 [] Soften “paths” (DBSignal / SysVar / PDU) everywhere they appear (SET/EXPECTED/COMPARE). Keep a safe fallback when the shape is unknown. (M)
 
@@ -20,7 +19,15 @@
 
 [] Inline single WAIT: if a state change has exactly one wait, render WAIT 1000 ms on the same line as the section label; keep a bulleted list if multiple waits. (S)
 
-[] Section semantics: switch list-item headers (Preparation/Steps/Completion) to real headings (<h3>…</h3>) with sibling <ul> for better readability/export. (S)
+[] Section semantics: switch list-item headers (Preparation/Steps/Completion) to real headings
+```
+(<h3>…</h3>)
+````
+with sibling
+```
+<ul>
+```
+for better readability/export. (S)
 
 [] Step numbering / anchors: optional per-TC counters (e.g., 2.4 EXPECTED …) and HTML anchors for easy reference in reviews. (M)
 
