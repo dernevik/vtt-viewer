@@ -1,16 +1,13 @@
 # Correctness \& coverage
 [] Resolve variable-backed WAIT values: show $Var (12345) when resolvable (local → global) across all shapes, not just common ones. (M)
 
-[] TTFUNC definition lookup hardening: we already inline many; add keys + exact container matches for rare shapes to avoid name collisions. (S)
+[] TTFUNC definition lookup hardening: add keys + exact container matches for rare shapes to avoid name collisions. (S)
 
 [] STATECHANGE/STATECHECK parity: ensure both honor the same WAIT/EXPECTED rules and title handling. (S)
 
-[] COMPARE/EXPECTED richness: cover additional operator/rendering cases (ranges, not-equals, valuetables) if present in your projects. (M)
+[] COMPARE/EXPECTED richness: cover additional operator/rendering cases (ranges, not-equals, valuetables) if present. (M)
 
-[] COMMENT robustness: we improved it; add fallback to suppress truly empty comments to avoid noise. (S)
-
-[] ACTIVE flag: decide: hide (default) or render once as metadata in TC header. (S)
-
+[] COMMENT robustness: add fallback to suppress truly empty comments to avoid noise. (S)
 
 # Reviewer UX / output polish
 [] Soften “paths” (DBSignal / SysVar / PDU) everywhere they appear (SET/EXPECTED/COMPARE). Keep a safe fallback when the shape is unknown. (M)
@@ -51,20 +48,16 @@ for better readability/export. (S)
 
 [] Define a tiny “viewer schema”: document the intermediate structure (Fixture→TC→Sections→Steps), so future code is against our schema, not Vector’s. (M)
 
-
-
 # Tooling / DevX
-
 [] Regression tests (golden files): commit 2–3 example VTTs and their expected HTML outputs; add a script to regenerate and diff on PRs. (M)
+
+[] Tiny regression example for NETFUNC under examples. A snippet with a NETFUNC and mixed param types.
 
 [] GitHub Actions: run the transform on samples, fail CI on diffs; optionally validate XML well-formedness. (M)
 
 [] VS Code task: one-click “Render current .vtt → HTML in examples/” (handy for contributors). (S)
 
-[] Optional Saxon HE path: allow using Saxon for XSLT 2.0 features if ever needed (kept off by default). (M)
-
 # Documentation
-
 [] README improvements: short “Architecture” section (helpers, keys, how fixtures are filtered), and “Contributing” (branching, labels, how to run tests). (S)
 
 [] Examples folder: keep the generic automotive demo VTT + rendered HTML (no internal data); link from README. (S)
@@ -73,7 +66,6 @@ for better readability/export. (S)
 
 
 # Nice-to-haves
-
 [] Plain-text renderer: a very compact listing for Gerrit side-by-side diffs (could be generated via the extractor or a simplified XSL). (M)
 
 [] Fixture / TC filters: already have -Fixture; optionally add -TestCaseId or -Contains "keyword" (PowerShell layer). (S)
@@ -84,14 +76,12 @@ for better readability/export. (S)
 
 
 # Suggested label set (reuse for issues)
-
 * type/enhancement, type/bug, type/refactor, type/docs
 * area/xslt, area/html-output, area/parser-semantics, area/tooling
 * priority/P1–P3, status/accepted
 
 
 # Suggested sequencing (low risk → higher impact)
-
 * UX polish: spacing, headings, single-line WAIT, empty-title suppression.
 * PrettyPath helper + wire it across SET/EXPECTED.
 * Keys + central helpers everywhere (finish consolidation).
