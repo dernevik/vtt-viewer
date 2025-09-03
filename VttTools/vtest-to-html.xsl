@@ -33,7 +33,6 @@
     4) Provide a muted fallback subtitle rather than failing hard
 -->
     <xsl:strip-space elements="*"/>
-    
     <!-- Optional filter: fixture title (exact match) -->
     <xsl:param name="fixture" select="''"/>
     <xsl:param name="showStepNumbers" select="'false'"/>
@@ -54,63 +53,150 @@
             </xsl:choose>
         </xsl:for-each>
     </xsl:template>
-    
-    
-    
     <!-- Always print VALUE + (optional) space + UNIT -->
-<xsl:template name="emit-value-with-unit">
-  <xsl:param name="value"/><xsl:param name="unit"/>
-  <xsl:value-of select="normalize-space($value)"/>
-  <xsl:if test="normalize-space($unit)!=''"><xsl:text> </xsl:text><xsl:value-of select="normalize-space($unit)"/></xsl:if>
-</xsl:template>
-
-<!-- Print a separator ONLY between items -->
-<xsl:template name="emit-sep">
-  <xsl:param name="pos"/><xsl:param name="sep" select="', '"/>
-  <xsl:if test="$pos &gt; 1"><xsl:value-of select="$sep"/></xsl:if>
-</xsl:template>
-
-<!-- Quote when type=String; else raw (fallback to bestValueLabel/dbobject) -->
-<xsl:template name="render-param">
-  <xsl:param name="param"/> <!-- a tt:param node -->
-  <xsl:variable name="typ" select="normalize-space($param/*[local-name()='type'])"/>
-  <xsl:variable name="const" select="normalize-space($param/*[local-name()='value']/*[local-name()='const'])"/>
-  <xsl:choose>
-    <xsl:when test="$const!=''">
-      <xsl:choose>
-        <xsl:when test="$typ='String'">"<xsl:value-of select="$const"/>”</xsl:when>
-        <xsl:otherwise><xsl:value-of select="$const"/></xsl:otherwise>
-      </xsl:choose>
-    </xsl:when>
-    <xsl:when test="$param/*[local-name()='value']">
-      <xsl:variable name="lbl">
-        <xsl:call-template name="bestValueLabel"><xsl:with-param name="ctx" select="$param/*[local-name()='value']"/></xsl:call-template>
-      </xsl:variable>
-      <xsl:choose>
-        <xsl:when test="$typ='String'">"<xsl:value-of select="normalize-space($lbl)"/>”</xsl:when>
-        <xsl:otherwise><xsl:value-of select="normalize-space($lbl)"/></xsl:otherwise>
-      </xsl:choose>
-    </xsl:when>
-    <xsl:when test="$param/*[local-name()='value']/*[local-name()='dbobject']">
-      <xsl:call-template name="prettyPath">
-        <xsl:with-param name="text" select="$param/*[local-name()='value']/*[local-name()='dbobject']"/>
-      </xsl:call-template>
-    </xsl:when>
-    <xsl:otherwise>?</xsl:otherwise>
-  </xsl:choose>
-</xsl:template>
-
-<!-- Render a comma-separated parameter list with controlled spaces -->
-<xsl:template name="render-param-list">
-  <xsl:param name="nodes"/> <!-- node-set of tt:param -->
-  <xsl:text>(</xsl:text>
-  <xsl:for-each select="$nodes">
-    <xsl:call-template name="emit-sep"><xsl:with-param name="pos" select="position()"/></xsl:call-template>
-    <xsl:call-template name="render-param"><xsl:with-param name="param" select="."/></xsl:call-template>
-  </xsl:for-each>
-  <xsl:text>)</xsl:text>
-</xsl:template>
-
+    <xsl:template name="emit-value-with-unit">
+        <xsl:param name="value"/>
+        <xsl:param name="unit"/>
+        <xsl:value-of select="normalize-space($value)"/>
+        <xsl:if test="normalize-space($unit)!=''">
+            <xsl:text> </xsl:text>
+            <xsl:value-of select="normalize-space($unit)"/>
+        </xsl:if>
+    </xsl:template>
+    <!-- Print a separator ONLY between items -->
+    <xsl:template name="emit-sep">
+        <xsl:param name="pos"/>
+        <xsl:param name="sep" select="', '"/>
+        <xsl:if test="$pos &gt; 1">
+            <xsl:value-of select="$sep"/>
+        </xsl:if>
+    </xsl:template>
+    <!-- Quote when type=String; else raw (fallback to bestValueLabel/dbobject) -->
+    <xsl:template name="render-param">
+        <xsl:param name="param"/>
+        <!-- a tt:param node -->
+        <xsl:variable name="typ" select="normalize-space($param/*[local-name()='type'])"/>
+        <xsl:variable name="const" select="normalize-space($param/*[local-name()='value']/*[local-name()='const'])"/>
+        <xsl:choose>
+            <xsl:when test="$const!=''">
+                <xsl:choose>
+                    <xsl:when test="$typ='String'">"<xsl:value-of select="$const"/>”</xsl:when>
+                    <xsl:otherwise>
+                        <xsl:value-of select="$const"/>
+                    </xsl:otherwise>
+                </xsl:choose>
+            </xsl:when>
+            <xsl:when test="$param/*[local-name()='value']">
+                <xsl:variable name="lbl">
+                    <xsl:call-template name="bestValueLabel">
+                        <xsl:with-param name="ctx" select="$param/*[local-name()='value']"/>
+                    </xsl:call-template>
+                </xsl:variable>
+                <xsl:choose>
+                    <xsl:when test="$typ='String'">"<xsl:value-of select="normalize-space($lbl)"/>”</xsl:when>
+                    <xsl:otherwise>
+                        <xsl:value-of select="normalize-space($lbl)"/>
+                    </xsl:otherwise>
+                </xsl:choose>
+            </xsl:when>
+            <xsl:when test="$param/*[local-name()='value']/*[local-name()='dbobject']">
+                <xsl:call-template name="prettyPath">
+                    <xsl:with-param name="text" select="$param/*[local-name()='value']/*[local-name()='dbobject']"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>?</xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+    <!-- Render a comma-separated parameter list with controlled spaces -->
+    <xsl:template name="render-param-list">
+        <xsl:param name="nodes"/>
+        <!-- node-set of tt:param -->
+        <xsl:text>(</xsl:text>
+        <xsl:for-each select="$nodes">
+            <xsl:call-template name="emit-sep">
+                <xsl:with-param name="pos" select="position()"/>
+            </xsl:call-template>
+            <xsl:call-template name="render-param">
+                <xsl:with-param name="param" select="."/>
+            </xsl:call-template>
+        </xsl:for-each>
+        <xsl:text>)</xsl:text>
+    </xsl:template>
+    <!-- render a single function argument -->
+    <xsl:template name="render-arg">
+        <xsl:param name="param"/>
+        <xsl:variable name="typ" select="normalize-space($param/*[local-name()='type'])"/>
+        <xsl:variable name="const" select="normalize-space($param/*[local-name()='value']//*[local-name()='const'][1])"/>
+        <xsl:choose>
+            <xsl:when test="$typ='String'">
+                <xsl:text>"</xsl:text>
+                <xsl:value-of select="$const"/>
+                <xsl:text>"</xsl:text>
+            </xsl:when>
+            <xsl:when test="$const!=''">
+                <xsl:value-of select="$const"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:call-template name="bestValueLabel">
+                    <xsl:with-param name="ctx" select="$param/*[local-name()='value']"/>
+                </xsl:call-template>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+    <!-- render a comma-separated argument list -->
+    <xsl:template name="render-arglist">
+        <xsl:param name="nodes"/>
+        <xsl:for-each select="$nodes">
+            <xsl:if test="position() &gt; 1">
+                <xsl:text>, </xsl:text>
+            </xsl:if>
+            <xsl:call-template name="render-arg">
+                <xsl:with-param name="param" select="."/>
+            </xsl:call-template>
+        </xsl:for-each>
+    </xsl:template>
+    <!-- render a duration like '500 ms' or '$Var s' -->
+    <xsl:template name="renderDuration">
+        <xsl:param name="time"/>
+        <xsl:variable name="const" select="normalize-space($time/*[local-name()='value']//*[local-name()='const'][1])"/>
+        <xsl:variable name="unit" select="normalize-space($time/*[local-name()='unit'][1])"/>
+        <xsl:choose>
+            <xsl:when test="$const!=''">
+                <xsl:value-of select="$const"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:call-template name="bestValueLabel">
+                    <xsl:with-param name="ctx" select="$time/*[local-name()='value']"/>
+                </xsl:call-template>
+            </xsl:otherwise>
+        </xsl:choose>
+        <xsl:if test="$unit!=''">
+            <xsl:text> </xsl:text>
+            <xsl:value-of select="$unit"/>
+        </xsl:if>
+    </xsl:template>
+    <!-- Extract a readable RHS value (valuetable, const, dbobject pretty, or variable label) -->
+    <xsl:template name="renderRhs">
+        <xsl:param name="node"/>
+        <xsl:choose>
+            <xsl:when test="normalize-space($node//*[local-name()='valuetable_entry'][1])!=''">
+                <xsl:value-of select="normalize-space($node//*[local-name()='valuetable_entry'][1])"/>
+            </xsl:when>
+            <xsl:when test="normalize-space($node//*[local-name()='const'][1])!=''">
+                <xsl:value-of select="normalize-space($node//*[local-name()='const'][1])"/>
+            </xsl:when>
+            <xsl:when test="normalize-space($node//*[local-name()='dbobject'][1])!=''">
+                <xsl:call-template name="prettyPath">
+                    <xsl:with-param name="text" select="normalize-space($node//*[local-name()='dbobject'][1])"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:call-template name="bestValueLabel">
+                    <xsl:with-param name="ctx" select="$node"/>
+                </xsl:call-template>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
     <!--
   Keys
   - tc-by-id:      tc / tc_definition by tcid
@@ -186,31 +272,16 @@
         </xsl:choose>
     </xsl:template>
     <!-- Helper: print one WAIT line from a time/timeout 'base' node -->
+    <!-- Generic: print one wait line from either a <wait> node or directly a <time> node -->
     <xsl:template name="emit-wait-line">
         <xsl:param name="base"/>
-        <xsl:variable name="unit" select="normalize-space(($base//*[local-name()='unit'])[1])"/>
-        <xsl:variable name="cval" select="normalize-space(($base//*[local-name()='const'])[1])"/>
-        <xsl:variable name="display">
-            <xsl:choose>
-                <xsl:when test="$cval!=''">
-                    <xsl:value-of select="$cval"/>
-                </xsl:when>
-                <xsl:otherwise>
-                    <xsl:call-template name="bestValueLabel">
-                        <xsl:with-param name="ctx" select="($base//*[local-name()='value'])[1]"/>
-                    </xsl:call-template>
-                </xsl:otherwise>
-            </xsl:choose>
-        </xsl:variable>
         <li>
             <code>
-                <xsl:text>WAIT</xsl:text>
-                <xsl:value-of select="$display"/>
-                <xsl:if test="$unit!=''">
-                    <xsl:text/>
-                    <!-- explicit space, never collapsed by XSLT -->
-                    <xsl:value-of select="$unit"/>
-                </xsl:if>
+      WAIT
+      <xsl:text> </xsl:text>
+                <xsl:call-template name="renderDuration">
+                    <xsl:with-param name="time" select="$base/*[local-name()='time'] | $base[local-name()='time']"/>
+                </xsl:call-template>
             </code>
         </li>
     </xsl:template>
@@ -907,78 +978,60 @@
     </xsl:template>
     <!-- ========== Step renderers ========== -->
     <!-- TTFUNC call: print call; inline body if a same-file definition exists -->
-    <xsl:template match="tt:ttfunction" mode="step">
-        <xsl:param name="indent"/>
-        <xsl:variable name="fname" select="normalize-space(tt:name)"/>
+    <!-- TTFUNC call: print call; inline body if a same-file definition exists -->
+    <xsl:template match="tt:ttfunction | *[local-name()='ttfunction']" mode="step">
+        <xsl:variable name="fname" select="normalize-space(*[local-name()='name'])"/>
         <li>
-            <code>TTFUNC<xsl:value-of select="$fname"/>(</code>
-            <xsl:for-each select="tt:param">
-                <xsl:if test="position() &gt; 1">
-                    <xsl:text>,</xsl:text>
-                </xsl:if>
-                <code>
-                    <xsl:call-template name="bestValueLabel">
-                        <xsl:with-param name="ctx" select="tt:value"/>
-                    </xsl:call-template>
-                </code>
-            </xsl:for-each>
-            <code>)</code>
-            <!-- Find a likely definition node elsewhere in the file.
-			 A) any element with child <name> == $fname (namespace-agnostic), or
-			 B) an element whose local-name() equals the function name,
-			 and which has step-like descendants. -->
+            <code>TTFUNC <xsl:value-of select="$fname"/>(<xsl:call-template name="render-arglist">
+                    <xsl:with-param name="nodes" select="*[local-name()='param']"/>
+                </xsl:call-template>)</code>
+            <!-- Find a likely definition node elsewhere in the file. -->
             <xsl:variable name="def" select="(
-			//*[
-			  *[local-name()='name' and normalize-space(.)=$fname]
-			  and (descendant::*[local-name()='set']
-				   or descendant::*[local-name()='wait']
-				   or descendant::*[local-name()='statechange']
-				   or descendant::*[local-name()='statecheck']
-				   or descendant::*[local-name()='variables']
-				   or descendant::*[local-name()='caplfunction']
-				   or descendant::*[local-name()='caplinline']
-				   or descendant::*[local-name()='occurrence_count']
-				   or descendant::*[local-name()='check_deactivation']
-				   or descendant::*[local-name()='awaitvaluematch']
-				   or descendant::*[local-name()='ttfunction']
-				   or descendant::*[local-name()='netfunction']
-				   or descendant::*[local-name()='diagservice']
-			  )
-			  and not(self::tt:ttfunction)
-			]
-			|
-			//*[
-			  local-name()=$fname
-			  and (descendant::*[local-name()='set'] or descendant::*[local-name()='wait'])
-			]
-		  )[1]"/>
+      //*[ *[local-name()='name' and normalize-space(.)=$fname]
+          and (
+            descendant::*[local-name()='set'] or
+            descendant::*[local-name()='wait'] or
+            descendant::*[local-name()='statechange'] or
+            descendant::*[local-name()='statecheck'] or
+            descendant::*[local-name()='variables'] or
+            descendant::*[local-name()='caplfunction'] or
+            descendant::*[local-name()='caplinline'] or
+            descendant::*[local-name()='occurrence_count'] or
+            descendant::*[local-name()='check_deactivation'] or
+            descendant::*[local-name()='awaitvaluematch'] or
+            descendant::*[local-name()='ttfunction'] or
+            descendant::*[local-name()='netfunction'] or
+            descendant::*[local-name()='diagservice']
+          )
+          and not(self::tt:ttfunction or local-name()='ttfunction')
+       ]
+       |
+       //*[ local-name()=$fname and (descendant::*[local-name()='set'] or descendant::*[local-name()='wait']) ]
+    )[1]"/>
             <xsl:choose>
                 <xsl:when test="$def">
-                    <span class="muted">— inlined</span>
+                    <span class="muted"> — inlined</span>
                     <ul>
                         <!-- Render the definition’s content; skip meta -->
                         <xsl:apply-templates select="$def/*[
-				not(local-name()='name' or local-name()='parameters' or
-					local-name()='title' or local-name()='attributes' or
-					local-name()='arguments' or local-name()='description')
-			  ]" mode="step"/>
+            not(local-name()='name' or local-name()='parameters' or
+                local-name()='title' or local-name()='attributes' or
+                local-name()='arguments' or local-name()='description')
+          ]" mode="step"/>
                     </ul>
                 </xsl:when>
                 <xsl:otherwise>
-                    <span class="muted">— definition not found (likely external)</span>
+                    <span class="muted"> — definition not found (likely external)</span>
                 </xsl:otherwise>
             </xsl:choose>
         </li>
     </xsl:template>
     <!-- CAPLFUNCTION -->
-    <xsl:template match="tt:caplfunction | *[local-name()='caplfunction' or local-name()='capl_function']" mode="step">
+    <xsl:template match="tt:caplfunction | *[local-name()='caplfunction']" mode="step">
+        <xsl:variable name="name" select="normalize-space(*[local-name()='name'])"/>
         <li>
-            <code>CAPLFUNCTION</code>
-            <code>
-                <xsl:value-of select="(tt:name | *[local-name()='name'])[1]"/>
-            </code>
-            <code>(<xsl:call-template name="join-params-html">
-                    <xsl:with-param name="ctx" select="."/>
+            <code>CAPLFUNCTION <xsl:value-of select="$name"/>(<xsl:call-template name="render-arglist">
+                    <xsl:with-param name="nodes" select="*[local-name()='param']"/>
                 </xsl:call-template>)</code>
         </li>
     </xsl:template>
@@ -1022,20 +1075,23 @@
             </ul>
         </li>
     </xsl:template>
-    <xsl:template match="tt:awaitvaluematch" mode="step">
+    <xsl:template match="tt:awaitvaluematch | *[local-name()='awaitvaluematch']" mode="step">
         <li>
-            <code>AWAITVALUEMATCH timeout=</code>
-            <code>
-                <xsl:call-template name="bestValueLabel">
-                    <xsl:with-param name="ctx" select="tt:timeout/tt:value"/>
-                </xsl:call-template>
-                <xsl:if test="normalize-space(tt:timeout/tt:unit)!=''">
-                    <xsl:text/>
-                    <xsl:value-of select="normalize-space(tt:timeout/tt:unit)"/>
-                </xsl:if>
-            </code>
+            <code>AWAITVALUEMATCH</code>
+            <xsl:variable name="to" select="*[local-name()='timeout'][1]"/>
+            <xsl:if test="$to">
+                <span class="muted">
+                    <xsl:text> timeout=</xsl:text>
+                    <code>
+                        <xsl:call-template name="renderDuration">
+                            <xsl:with-param name="time" select="$to"/>
+                        </xsl:call-template>
+                    </code>
+                </span>
+            </xsl:if>
+            <!-- keep your existing comparison list rendering below -->
             <ul>
-                <xsl:apply-templates select="tt:compare" mode="step"/>
+                <xsl:apply-templates select="tt:*[not(self::tt:timeout)] | *[local-name()!='timeout']" mode="step"/>
             </ul>
         </li>
     </xsl:template>
@@ -1091,18 +1147,22 @@
                         <xsl:apply-templates select="(tt:in | *[local-name()='in'])/*[local-name()='compare']" mode="step"/>
                     </ul>
                 </li>
-                <!-- WAIT / TIMEOUT: list any descendant waits/timeouts -->
-                <xsl:variable name="waitNodes" select=".//*[local-name()='wait' or local-name()='timeout']"/>
+                <!-- WAIT: list any descendant waits (STATECHANGE never has timeout) -->
+                <xsl:variable name="waitNodes" select=".//*[local-name()='wait']"/>
                 <xsl:if test="$waitNodes">
                     <li>
                         <em>WAIT</em>
                         <ul>
                             <xsl:for-each select="$waitNodes">
-                                <!-- choose a base node that has value/unit underneath -->
-                                <xsl:variable name="base" select="(.//*[local-name()='time' or local-name()='timeout'] | self::node())[1]"/>
-                                <xsl:call-template name="emit-wait-line">
-                                    <xsl:with-param name="base" select="$base"/>
-                                </xsl:call-template>
+                                <li>
+                                    <code>
+            WAIT <xsl:text> </xsl:text>
+                                        <xsl:call-template name="renderDuration">
+                                            <!-- renderDuration expects the <time> node -->
+                                            <xsl:with-param name="time" select="*[local-name()='time']"/>
+                                        </xsl:call-template>
+                                    </code>
+                                </li>
                             </xsl:for-each>
                         </ul>
                     </li>
@@ -1373,116 +1433,56 @@
     <xsl:template match="tt:occurrence_count | *[local-name()='occurrence_count']" mode="step">
         <li>
             <code>OCCURRENCE_COUNT</code>
-            <!-- Optional title/name -->
-            <xsl:variable name="tTitle" select="normalize-space( (tt:title | *[local-name()='title'] | tt:name | *[local-name()='name'])[1] )"/>
+            <xsl:variable name="tTitle" select="normalize-space((*[local-name()='title' or local-name()='name'])[1])"/>
             <xsl:if test="$tTitle!=''">
-                <span class="muted">—<xsl:value-of select="$tTitle"/>
+                <span class="muted"> — <xsl:value-of select="$tTitle"/>
                 </span>
             </xsl:if>
             <ul>
-                <!-- limits: min / max / timeout (robust + variable-aware) -->
-                <xsl:variable name="minNode" select="(tt:mincount | *[local-name()='mincount'])[1]"/>
-                <xsl:variable name="maxNode" select="(tt:maxcount | *[local-name()='maxcount'])[1]"/>
-                <xsl:variable name="toNode" select="(tt:timeout  | *[local-name()='timeout'])[1]"/>
+                <xsl:variable name="minNode" select="(*[local-name()='mincount'])[1]"/>
+                <xsl:variable name="maxNode" select="(*[local-name()='maxcount'])[1]"/>
+                <xsl:variable name="toNode" select="(*[local-name()='timeout'])[1]"/>
                 <xsl:if test="$minNode or $maxNode or $toNode">
                     <li class="muted">
-                        <xsl:text>limits:</xsl:text>
-                        <!-- min -->
-                        <xsl:if test="$minNode">
-                            <xsl:text>min=</xsl:text>
-                            <code>
-                                <xsl:choose>
-                                    <xsl:when test="normalize-space($minNode//*[local-name()='const'][1])!=''">
-                                        <xsl:value-of select="normalize-space($minNode//*[local-name()='const'][1])"/>
-                                    </xsl:when>
-                                    <xsl:when test="$minNode//*[local-name()='value'][1]">
-                                        <xsl:call-template name="bestValueLabel">
-                                            <xsl:with-param name="ctx" select="$minNode//*[local-name()='value'][1]"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:otherwise>
-                                        <xsl:value-of select="normalize-space(string($minNode))"/>
-                                    </xsl:otherwise>
-                                </xsl:choose>
+                        <xsl:text>limits: </xsl:text>
+                        <xsl:if test="$minNode">min=<code>
+                                <xsl:value-of select="normalize-space(string($minNode))"/>
                             </code>
                         </xsl:if>
-                        <!-- separators -->
                         <xsl:if test="$minNode and ($maxNode or $toNode)">
-                            <xsl:text>;</xsl:text>
+                            <xsl:text>; </xsl:text>
                         </xsl:if>
-                        <!-- max -->
-                        <xsl:if test="$maxNode">
-                            <xsl:text>max=</xsl:text>
-                            <code>
-                                <xsl:choose>
-                                    <xsl:when test="normalize-space($maxNode//*[local-name()='const'][1])!=''">
-                                        <xsl:value-of select="normalize-space($maxNode//*[local-name()='const'][1])"/>
-                                    </xsl:when>
-                                    <xsl:when test="$maxNode//*[local-name()='value'][1]">
-                                        <xsl:call-template name="bestValueLabel">
-                                            <xsl:with-param name="ctx" select="$maxNode//*[local-name()='value'][1]"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:otherwise>
-                                        <xsl:value-of select="normalize-space(string($maxNode))"/>
-                                    </xsl:otherwise>
-                                </xsl:choose>
+                        <xsl:if test="$maxNode">max=<code>
+                                <xsl:value-of select="normalize-space(string($maxNode))"/>
                             </code>
                         </xsl:if>
                         <xsl:if test="$maxNode and $toNode">
-                            <xsl:text>;</xsl:text>
+                            <xsl:text>; </xsl:text>
                         </xsl:if>
                         <!-- timeout -->
                         <xsl:if test="$toNode">
                             <xsl:text>timeout=</xsl:text>
                             <code>
-                                <xsl:choose>
-                                    <xsl:when test="normalize-space($toNode//*[local-name()='const'][1])!=''">
-                                        <xsl:value-of select="normalize-space($toNode//*[local-name()='const'][1])"/>
-                                    </xsl:when>
-                                    <xsl:when test="$toNode//*[local-name()='value'][1]">
-                                        <xsl:call-template name="bestValueLabel">
-                                            <xsl:with-param name="ctx" select="$toNode//*[local-name()='value'][1]"/>
-                                        </xsl:call-template>
-                                    </xsl:when>
-                                    <xsl:otherwise>
-                                        <xsl:value-of select="normalize-space(string($toNode))"/>
-                                    </xsl:otherwise>
-                                </xsl:choose>
-                                <!-- guaranteed space before unit -->
-                                <xsl:variable name="tUnit" select="normalize-space(($toNode//*[local-name()='unit'])[1])"/>
-                                <xsl:if test="$tUnit!=''">
-                                    <xsl:text/>
-                                    <xsl:value-of select="$tUnit"/>
-                                </xsl:if>
+                                <xsl:call-template name="renderDuration">
+                                    <xsl:with-param name="time" select="$toNode"/>
+                                </xsl:call-template>
                             </code>
                         </xsl:if>
                     </li>
                 </xsl:if>
-                <!-- Optional join condition (e.g., AND/OR) -->
-                <xsl:variable name="join" select="normalize-space( (tt:joincondition | *[local-name()='joincondition'])[1] )"/>
-                <xsl:if test="$join!=''">
-                    <li class="muted">join=<code>
-                            <xsl:value-of select="$join"/>
-                        </code>
-                    </li>
-                </xsl:if>
-                <!-- Watched objects: prefer explicit dbobject; fallback to node string-value -->
-                <xsl:for-each select="(tt:objects | *[local-name()='objects'])[1]/*">
+                <!-- Objects -->
+                <xsl:for-each select="(*[local-name()='objects'])[1]/*">
                     <li>
                         <code>
                             <xsl:variable name="raw" select="normalize-space( (./tt:dbobject | ./*[local-name()='dbobject'] | .)[1] )"/>
                             <xsl:choose>
-                                <!-- PDU: compact label -->
                                 <xsl:when test="local-name(.)='pdu' or contains($raw,'DBFrameOrPDU')">
-                                    <xsl:text>PDU</xsl:text>
+                                    <xsl:text>PDU </xsl:text>
                                     <xsl:call-template name="pduLabel">
                                         <xsl:with-param name="path" select="$raw"/>
                                     </xsl:call-template>
                                 </xsl:when>
-                                <!-- Everything else -->
                                 <xsl:otherwise>
-                                    <xsl:text>OBJ</xsl:text>
                                     <xsl:call-template name="prettyPath">
                                         <xsl:with-param name="text" select="$raw"/>
                                     </xsl:call-template>
@@ -1598,19 +1598,23 @@
     </xsl:template>
     <!-- WAIT step -->
     <xsl:template match="tt:wait | *[local-name()='wait']" mode="step">
-        <xsl:variable name="base" select="(.//*[local-name()='time' or local-name()='timeout']
-				| *[local-name()='time' or local-name()='timeout'])[1]"/>
-        <xsl:if test="$base">
-            <xsl:call-template name="emit-wait-line">
-                <xsl:with-param name="base" select="$base"/>
-            </xsl:call-template>
-        </xsl:if>
+        <li>
+            <code>WAIT <xsl:call-template name="renderDuration">
+                    <xsl:with-param name="time" select="*[local-name()='time']"/>
+                </xsl:call-template>
+            </code>
+        </li>
     </xsl:template>
-    <!-- TIMEOUT step (if your files ever use direct <timeout>) -->
+    <!-- TIMEOUT step -->
     <xsl:template match="tt:timeout | *[local-name()='timeout']" mode="step">
-        <xsl:call-template name="emit-wait-line">
-            <xsl:with-param name="base" select="."/>
-        </xsl:call-template>
+        <li>
+            <code>TIMEOUT <xsl:text> </xsl:text>
+                <xsl:call-template name="renderDuration">
+                    <!-- here the timeout element itself has value/unit -->
+                    <xsl:with-param name="time" select="."/>
+                </xsl:call-template>
+            </code>
+        </li>
     </xsl:template>
     <!-- DIAGSERVICE: show DID/service title; indicate request/response presence -->
     <xsl:template match="tt:diagservice | *[local-name()='diagservice']" mode="step">
@@ -1642,17 +1646,14 @@
     </xsl:template>
     <!-- NETFUNC: name(<joined args>), show class if present -->
     <xsl:template match="tt:netfunction | *[local-name()='netfunction']" mode="step">
+        <xsl:variable name="name" select="normalize-space(*[local-name()='name'])"/>
+        <xsl:variable name="cls" select="normalize-space(*[local-name()='class'])"/>
         <li>
-            <code>NETFUNC</code>
-            <code>
-                <xsl:value-of select="normalize-space((tt:name|*[local-name()='name'])[1])"/>
-            </code>
-            <code>(<xsl:call-template name="join-params-html">
-                    <xsl:with-param name="ctx" select="."/>
+            <code>NETFUNC <xsl:value-of select="$name"/>(<xsl:call-template name="render-arglist">
+                    <xsl:with-param name="nodes" select="*[local-name()='param']"/>
                 </xsl:call-template>)</code>
-            <xsl:variable name="cls" select="normalize-space((tt:class|*[local-name()='class'])[1])"/>
             <xsl:if test="$cls!=''">
-                <span class="muted">— class=<code>
+                <span class="muted"> — class=<code>
                         <xsl:value-of select="$cls"/>
                     </code>
                 </span>
