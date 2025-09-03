@@ -32,6 +32,8 @@
     3) Reuse helpers: bestValueLabel, prettyPath, join-params-html
     4) Provide a muted fallback subtitle rather than failing hard
 -->
+    <xsl:strip-space elements="*"/>
+    
     <!-- Optional filter: fixture title (exact match) -->
     <xsl:param name="fixture" select="''"/>
     <xsl:param name="showStepNumbers" select="'false'"/>
@@ -52,6 +54,63 @@
             </xsl:choose>
         </xsl:for-each>
     </xsl:template>
+    
+    
+    
+    <!-- Always print VALUE + (optional) space + UNIT -->
+<xsl:template name="emit-value-with-unit">
+  <xsl:param name="value"/><xsl:param name="unit"/>
+  <xsl:value-of select="normalize-space($value)"/>
+  <xsl:if test="normalize-space($unit)!=''"><xsl:text> </xsl:text><xsl:value-of select="normalize-space($unit)"/></xsl:if>
+</xsl:template>
+
+<!-- Print a separator ONLY between items -->
+<xsl:template name="emit-sep">
+  <xsl:param name="pos"/><xsl:param name="sep" select="', '"/>
+  <xsl:if test="$pos &gt; 1"><xsl:value-of select="$sep"/></xsl:if>
+</xsl:template>
+
+<!-- Quote when type=String; else raw (fallback to bestValueLabel/dbobject) -->
+<xsl:template name="render-param">
+  <xsl:param name="param"/> <!-- a tt:param node -->
+  <xsl:variable name="typ" select="normalize-space($param/*[local-name()='type'])"/>
+  <xsl:variable name="const" select="normalize-space($param/*[local-name()='value']/*[local-name()='const'])"/>
+  <xsl:choose>
+    <xsl:when test="$const!=''">
+      <xsl:choose>
+        <xsl:when test="$typ='String'">"<xsl:value-of select="$const"/>”</xsl:when>
+        <xsl:otherwise><xsl:value-of select="$const"/></xsl:otherwise>
+      </xsl:choose>
+    </xsl:when>
+    <xsl:when test="$param/*[local-name()='value']">
+      <xsl:variable name="lbl">
+        <xsl:call-template name="bestValueLabel"><xsl:with-param name="ctx" select="$param/*[local-name()='value']"/></xsl:call-template>
+      </xsl:variable>
+      <xsl:choose>
+        <xsl:when test="$typ='String'">"<xsl:value-of select="normalize-space($lbl)"/>”</xsl:when>
+        <xsl:otherwise><xsl:value-of select="normalize-space($lbl)"/></xsl:otherwise>
+      </xsl:choose>
+    </xsl:when>
+    <xsl:when test="$param/*[local-name()='value']/*[local-name()='dbobject']">
+      <xsl:call-template name="prettyPath">
+        <xsl:with-param name="text" select="$param/*[local-name()='value']/*[local-name()='dbobject']"/>
+      </xsl:call-template>
+    </xsl:when>
+    <xsl:otherwise>?</xsl:otherwise>
+  </xsl:choose>
+</xsl:template>
+
+<!-- Render a comma-separated parameter list with controlled spaces -->
+<xsl:template name="render-param-list">
+  <xsl:param name="nodes"/> <!-- node-set of tt:param -->
+  <xsl:text>(</xsl:text>
+  <xsl:for-each select="$nodes">
+    <xsl:call-template name="emit-sep"><xsl:with-param name="pos" select="position()"/></xsl:call-template>
+    <xsl:call-template name="render-param"><xsl:with-param name="param" select="."/></xsl:call-template>
+  </xsl:for-each>
+  <xsl:text>)</xsl:text>
+</xsl:template>
+
     <!--
   Keys
   - tc-by-id:      tc / tc_definition by tcid
