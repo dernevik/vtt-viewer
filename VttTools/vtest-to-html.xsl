@@ -869,7 +869,7 @@
     <!-- ========== Fixture ========== -->
     <xsl:template match="tt:tf">
         <div class="fixture" id="{normalize-space(tt:title)}">
-            <h2>Fixture:<xsl:value-of select="normalize-space(tt:title)"/>
+            <h2>Fixture: <xsl:value-of select="normalize-space(tt:title)"/>
             </h2>
             <xsl:apply-templates select="tt:preparation"/>
             <xsl:apply-templates select="tt:ts"/>
@@ -954,8 +954,8 @@
         <xsl:variable name="id" select="normalize-space(tt:tcid)"/>
         <h3>
             <xsl:choose>
-                <xsl:when test="self::tt:tc_definition">TC Definition:</xsl:when>
-                <xsl:otherwise>TestCase:</xsl:otherwise>
+                <xsl:when test="self::tt:tc_definition">TC Definition: </xsl:when>
+                <xsl:otherwise>TestCase: </xsl:otherwise>
             </xsl:choose>
             <xsl:value-of select="$title"/>
             <xsl:if test="$id!=''">
@@ -1213,7 +1213,7 @@
                 <xsl:variable name="ttl" select="normalize-space( (tt:title | *[local-name()='title'] | tt:name | *[local-name()='name'])[1] )"/>
                 <xsl:if test="$ttl!=''">
                     <li>
-                        <em>TITLE:</em>
+                        <em>TITLE: </em>
                         <span class="muted">
                             <xsl:value-of select="$ttl"/>
                         </span>
@@ -1367,39 +1367,45 @@
             </ul>
         </li>
     </xsl:template>
-    <xsl:template match="tt:variables/tt:variable_definition" mode="step">
-        <li>
-            <code>VARIABLE_DEFINITION</code>
-            <xsl:variable name="nm" select="normalize-space(tt:name)"/>
-            <xsl:variable name="typ" select="normalize-space(tt:type)"/>
-            <xsl:variable name="src">
-                <xsl:choose>
-                    <xsl:when test="tt:source/tt:valuetable_entry">
-                        <xsl:value-of select="normalize-space(tt:source/tt:valuetable_entry)"/>
-                    </xsl:when>
-                    <xsl:when test="tt:source/tt:value/tt:const">
-                        <xsl:value-of select="normalize-space(tt:source/tt:value/tt:const)"/>
-                    </xsl:when>
-                    <xsl:otherwise>
-                        <xsl:value-of select="normalize-space(tt:source)"/>
-                    </xsl:otherwise>
-                </xsl:choose>
-            </xsl:variable>
-            <xsl:if test="$nm!='' or $typ!='' or $src!=''">
-                <xsl:text/>
-                <code>
-                    <xsl:value-of select="$nm"/>
-                    <xsl:if test="$typ!=''">:<xsl:value-of select="$typ"/>
-                    </xsl:if>
-                    <xsl:if test="$src!=''">←<xsl:value-of select="$src"/>
-                    </xsl:if>
-                </code>
-            </xsl:if>
-            <ul>
-                <xsl:apply-templates select="tt:*[not(self::tt:name or self::tt:type or self::tt:source)]" mode="step"/>
-            </ul>
-        </li>
-    </xsl:template>
+    
+    <!-- VARIABLE_DEFINITION (namespace-agnostic) -->
+<xsl:template match="tt:variable_definition | *[local-name()='variable_definition']" mode="step">
+  <li>
+    <code>
+      VARIABLE_DEFINITION
+      <xsl:text> </xsl:text>
+
+      <!-- name -->
+      <xsl:value-of select="normalize-space((tt:name | *[local-name()='name'])[1])"/>
+
+      <!-- :type -->
+      <xsl:text>:</xsl:text>
+      <xsl:value-of select="normalize-space((tt:type | *[local-name()='type'])[1])"/>
+
+      <!-- ← value (if any) -->
+      <xsl:variable name="valNode"
+        select="(tt:value | *[local-name()='value'] | .//*[local-name()='value'])[1]"/>
+      <xsl:variable name="hasVal"
+        select="boolean($valNode | .//*[local-name()='valuetable_entry']
+                         | .//*[local-name()='const']
+                         | .//*[local-name()='dbobject']
+                         | .//*[local-name()='path'])"/>
+
+      <xsl:if test="$hasVal">
+        <xsl:text> </xsl:text>
+        <xsl:text>&#x2190;</xsl:text> <!-- ← -->
+        <xsl:text> </xsl:text>
+        <xsl:call-template name="bestValueLabel">
+          <xsl:with-param name="ctx" select="$valNode"/>
+        </xsl:call-template>
+      </xsl:if>
+    </code>
+  </li>
+</xsl:template>
+
+    
+    
+    
     <xsl:template match="tt:assignment" mode="step">
         <li>
             <code>
@@ -1425,7 +1431,7 @@
         <xsl:variable name="t" select="normalize-space(string($tNode))"/>
         <xsl:if test="$t!=''">
             <li>
-                <em>TITLE</em>:<xsl:value-of select="$t"/>
+                <em>TITLE</em>: <xsl:value-of select="$t"/>
             </li>
         </xsl:if>
     </xsl:template>
@@ -1661,15 +1667,15 @@
         </li>
     </xsl:template>
     <!-- CAPLFUNCTION: name(<joined args>); mirrors NETFUNC formatting -->
-    <xsl:template match="tt:caplfunction | *[local-name()='caplfunction' or local-name()='capl_function']" mode="step">
+    <!-- after -->
+    <xsl:template match="tt:caplfunction | *[local-name()='caplfunction']" mode="step">
         <li>
-            <code>CAPLFUNCTION</code>
             <code>
-                <xsl:value-of select="(tt:name | *[local-name()='name'])[1]"/>
+      CAPLFUNCTION
+      <xsl:text> </xsl:text>
+                <xsl:value-of select="normalize-space((.//tt:name | ./*[local-name()='name'])[1])"/>
+                <xsl:text>()</xsl:text>
             </code>
-            <code>(<xsl:call-template name="join-params-html">
-                    <xsl:with-param name="ctx" select="."/>
-                </xsl:call-template>)</code>
         </li>
     </xsl:template>
     <!-- Fallback step: uppercase tag; show muted subtitle from title/text/message -->
