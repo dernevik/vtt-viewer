@@ -32,53 +32,15 @@ Remove-Item 'C:\Scripts\VttTools' -Force      # removes junction only
 # (optional) restore your backup if you created one earlier
 Rename-Item 'C:\Scripts\VttTools.bak' 'C:\Scripts\VttTools'
 ```
-
-
-Create C:\Scripts\Show-Vtt.ps1 with this content (example path):
-
+Copy the available script
 ```
-param(
-  [Parameter(Mandatory)][string]$Path,
-  [string]$Fixture = "",
-  [ValidateSet("html","md")][string]$Format = "html"
-)
-
-$xsl = if ($Format -eq 'md') { 'vtest-to-markdown.xsl' } else { 'vtest-to-html.xsl' }
-$xslPath = Join-Path 'C:\Scripts\VttTools' $xsl
-
-$xml = New-Object System.Xml.XmlDocument
-$xml.Load((Resolve-Path $Path))
-
-$xslt = New-Object System.Xml.Xsl.XslCompiledTransform
-$xslt.Load($xslPath)
-
-$args = New-Object System.Xml.Xsl.XsltArgumentList
-if ($Fixture) { $args.AddParam('fixture','', $Fixture) }
-
-$stem = [IO.Path]::GetFileNameWithoutExtension($Path)
-$dir  = Split-Path -Parent $Path
-$suffix = ($Fixture ? "_$($Fixture.Replace(' ','_'))" : "")
-$out = Join-Path $dir ("{0}{1}.{2}" -f $stem,$suffix,$Format)
-
-$enc = [System.Text.Encoding]::UTF8
-$tw = New-Object System.IO.StreamWriter($out,$false,$enc)
-$xslt.Transform($xml,$args,$tw)
-$tw.Close()
-Write-Host "Wrote $out"
+Show-Vtt.ps1
 ```
+to a suitable location, e.g., \Scripts\
 
-It is practical to add an alias to your PowerShell profile:
+Also update your $PROFILE, and add the snippet provided:
 ```
-notepad $PROFILE
-```
-(then add a line like below and save) (example path shown)
-
-```
-function vtt { param($Path, $Fixture, $Format='html'); & 'C:\Scripts\Show-Vtt.ps1' -Path $Path -Fixture $Fixture -Format $Format }
-```
-reload current session (or open a new terminal)
-```
-. $PROFILE
+snippet-for-profile.ps1
 ```
 ## List fixtures quickly (PowerShell profile helper)
 
