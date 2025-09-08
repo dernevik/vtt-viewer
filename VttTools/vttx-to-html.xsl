@@ -2,6 +2,43 @@
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:v="urn:vttx:v0.1" exclude-result-prefixes="v">
     <xsl:output method="html" indent="yes"/>
     <xsl:strip-space elements="*"/>
+    <!-- prettyPath: best-effort short label from a raw path -->
+    <xsl:template name="prettyPath">
+        <xsl:param name="raw"/>
+        <xsl:variable name="r" select="normalize-space($raw)"/>
+        <xsl:variable name="label">
+            <xsl:choose>
+                <xsl:when test="contains($r,'_BEGIN_OF_OBJECT|')">
+                    <xsl:value-of select="substring-before(substring-after($r,'_BEGIN_OF_OBJECT|'),'|END_OF_OBJECT')"/>
+                </xsl:when>
+                <xsl:when test="contains($r,'|')">
+                    <xsl:call-template name="after-last">
+                        <xsl:with-param name="s" select="$r"/>
+                    </xsl:call-template>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xsl:value-of select="$r"/>
+                </xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
+        <xsl:value-of select="normalize-space($label)"/>
+    </xsl:template>
+    <!-- after-last (same behavior as extractor’s) -->
+    <xsl:template name="after-last">
+        <xsl:param name="s"/>
+        <xsl:param name="delim" select="'|'"/>
+        <xsl:choose>
+            <xsl:when test="contains($s,$delim)">
+                <xsl:call-template name="after-last">
+                    <xsl:with-param name="s" select="substring-after($s,$delim)"/>
+                    <xsl:with-param name="delim" select="$delim"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$s"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
     <!-- optional fixture title to render; empty => render all -->
     <xsl:param name="fixture"/>
     <!-- helpers for case-insensitive compare -->
@@ -141,9 +178,97 @@
         </li>
     </xsl:template>
     <!-- unknown tags: keep visible so we know what to add next -->
-    <xsl:template match="v:unknown">
-        <li class="muted">
-            <code>(unhandled: <xsl:value-of select="@tag"/>)</code>
+    <!-- SET -->
+    <xsl:template match="v:set">
+        <li>
+            <code>SET</code>
+            <ul>
+                <xsl:for-each select="v:assign">
+                    <li>
+                        <code>
+                            <!-- LHS -->
+                            <xsl:variable name="lhsKind" select="normalize-space(v:lhs/@kind)"/>
+                            <xsl:choose>
+                                <xsl:when test="$lhsKind='SysVar'">SysVar </xsl:when>
+                                <xsl:when test="$lhsKind='DBSignal'">DBSignal </xsl:when>
+                                <xsl:when test="$lhsKind='PDU'">PDU </xsl:when>
+                                <xsl:otherwise/>
+                            </xsl:choose>
+                            <xsl:call-template name="prettyPath">
+                                <xsl:with-param name="raw" select="v:lhs/@raw"/>
+                            </xsl:call-template>
+                            <xsl:text> = </xsl:text>
+                            <!-- RHS -->
+                            <xsl:variable name="rtype" select="normalize-space(v:rhs/@type)"/>
+                            <xsl:variable name="rval" select="normalize-space(v:rhs/@value)"/>
+                            <xsl:choose>
+                                <xsl:when test="$rtype='valuetable' or $rtype='const' or $rtype='text'">
+                                    <xsl:value-of select="$rval"/>
+                                </xsl:when>
+                                <xsl:when test="$rtype='dbobject'">
+                                    <xsl:call-template name="prettyPath">
+                                        <xsl:with-param name="raw" select="$rval"/>
+                                    </xsl:call-template>
+                                </xsl:when>
+                                <xsl:when test="$rtype='variable'">
+                                    <xsl:text>$</xsl:text>
+                                    <xsl:value-of select="$rval"/>
+                                </xsl:when>
+                                <xsl:otherwise>?</xsl:otherwise>
+                            </xsl:choose>
+                        </code>
+                    </li>
+                </xsl:for-each>
+            </ul>
         </li>
     </xsl:template>
+    <!-- VARIABLES -->
+    <xsl:template match="v:variables">
+        <li>
+            <code>VARIABLE_DEFINITION</code>
+            <ul>
+                <xsl:for-each select="v:var">
+                    <li>
+                        <code>
+                            <xsl:value-of select="@name"/>
+                            <xsl:if test="normalize-space(@vtype)!=''">
+                                <xsl:text>:</xsl:text>
+                                <xsl:value-of select="@vtype"/>
+                            </xsl:if>
+                            <xsl:if test="normalize-space(@init)!=''">
+                                <xsl:text> ← </xsl:text>
+                                <xsl:value-of select="@init"/>
+                            </xsl:if>
+                        </code>
+                    </li>
+                </xsl:for-each>
+            </ul>
+        </li>
+    </xsl:template>
+    <!-- VARIABLES block -->
+    <xsl:template match="v:variables">
+        <li>
+            <strong>VARIABLES</strong>
+            <ul>
+                <xsl:apply-templates select="v:vardef"/>
+            </ul>
+        </li>
+    </xsl:template>
+    <!-- One variable definition line -->
+    <xsl:template match="v:vardef">
+        <li>
+            <code>
+                <xsl:value-of select="@name"/>
+                <xsl:if test="@type">:<xsl:value-of select="@type"/>
+                </xsl:if>
+                <xsl:text> ← </xsl:text>
+                <xsl:value-of select="@value"/>
+            </code>
+        </li>
+    </xsl:template>
+<xsl:template match="v:unknown">
+        <li class="muted">
+        <code>(unhandled: <xsl:value-of select="@tag"/>)</code>
+    </li>
+</xsl:template>
 </xsl:stylesheet>

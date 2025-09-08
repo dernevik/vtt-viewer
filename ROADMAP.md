@@ -88,3 +88,14 @@ for better readability/export. (S)
 * Regression tests + CI.
 * Extractor → renderers refactor
 * Plain-text renderer and/or VS Code task.
+
+
+# Backlog
+## Small backlog: DBSignal prettifier (next tiny branch)
+Name: feat/pretty-signal-labels
+Scope (kept deliberately small):
+Renderer-only helper to turn the lhs/@raw into a short label:
+strip the config token (e.g., *Cfg)
+prefer PDU.Signal where possible
+fallback to Signal
+Apply to SET lines (DBSignal & SysVar).

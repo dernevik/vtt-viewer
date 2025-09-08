@@ -2,6 +2,22 @@
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:tt="http://www.vector-informatik.de/ITE/TestTable/1.0" xmlns="urn:vttx:v0.1" exclude-result-prefixes="tt">
     <xsl:output method="xml" indent="yes"/>
     <xsl:strip-space elements="*"/>
+    <!-- Return substring after the last occurrence of $delim (default '|') -->
+    <xsl:template name="after-last">
+        <xsl:param name="s"/>
+        <xsl:param name="delim" select="'|'"/>
+        <xsl:choose>
+            <xsl:when test="contains($s,$delim)">
+                <xsl:call-template name="after-last">
+                    <xsl:with-param name="s" select="substring-after($s,$delim)"/>
+                    <xsl:with-param name="delim" select="$delim"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$s"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
     <!-- ===================== ROOT ===================== -->
     <!-- Start at top-level fixtures (those not inside another fixture) -->
     <xsl:template match="/">
@@ -119,6 +135,115 @@
             </xsl:for-each>
         </netfunc>
     </xsl:template>
+    <!-- SET: collect assignments with LHS raw path + kind + label, and RHS typed value -->
+    <xsl:template match="tt:set">
+        <set>
+            <xsl:for-each select="tt:in/tt:assignment">
+                <assign>
+                    <!-- LHS -->
+                    <xsl:variable name="lhsRaw" select="normalize-space(
+                    (tt:sink/tt:dbobject
+                   |tt:sink/*[local-name()='dbobject' or local-name()='dbsignal']
+                   |tt:sink/*[local-name()='path']
+                   |tt:sink/*[local-name()='name']
+                   )[1])"/>
+                    <xsl:variable name="lhsKind">
+                        <xsl:choose>
+                            <xsl:when test="starts-with($lhsRaw,'SysVar')">SysVar</xsl:when>
+                            <xsl:when test="starts-with($lhsRaw,'DBSignal')">DBSignal</xsl:when>
+                            <xsl:when test="starts-with($lhsRaw,'PDU') or starts-with($lhsRaw,'DBFrameOrPDU')">PDU</xsl:when>
+                            <xsl:otherwise>Path</xsl:otherwise>
+                        </xsl:choose>
+                    </xsl:variable>
+                    <xsl:variable name="lhsLabel">
+                        <xsl:call-template name="after-last">
+                            <xsl:with-param name="s" select="$lhsRaw"/>
+                        </xsl:call-template>
+                    </xsl:variable>
+                    <lhs raw="{$lhsRaw}" kind="{$lhsKind}">
+                        <label>
+                            <xsl:value-of select="normalize-space($lhsLabel)"/>
+                        </label>
+                    </lhs>
+                    <!-- RHS -->
+                    <xsl:variable name="rVte" select="normalize-space(tt:source/tt:value/tt:valuetable_entry)"/>
+                    <xsl:variable name="rConst" select="normalize-space(tt:source/tt:value/tt:const)"/>
+                    <xsl:variable name="rDb" select="normalize-space(tt:source/tt:value/tt:dbobject)"/>
+                    <xsl:variable name="rVar" select="normalize-space(tt:source/tt:value/*[local-name()='variable'][1])"/>
+                    <xsl:variable name="rFree" select="normalize-space(tt:source)"/>
+                    <xsl:choose>
+                        <xsl:when test="$rVte!=''">
+                            <rhs type="valuetable" value="{$rVte}"/>
+                        </xsl:when>
+                        <xsl:when test="$rConst!=''">
+                            <rhs type="const" value="{$rConst}"/>
+                        </xsl:when>
+                        <xsl:when test="$rDb!=''">
+                            <rhs type="dbobject" value="{$rDb}"/>
+                        </xsl:when>
+                        <xsl:when test="$rVar!=''">
+                            <rhs type="variable" value="{$rVar}"/>
+                        </xsl:when>
+                        <xsl:when test="$rFree!=''">
+                            <rhs type="text" value="{$rFree}"/>
+                        </xsl:when>
+                        <xsl:otherwise>
+                            <rhs type="unknown" value="?"/>
+                        </xsl:otherwise>
+                    </xsl:choose>
+                </assign>
+            </xsl:for-each>
+        </set>
+    </xsl:template>
+     <!-- VARIABLES container -->
+  <xsl:template match="tt:variables">
+    <variables>
+      <xsl:apply-templates select="tt:variable_definition"/>
+    </variables>
+  </xsl:template>
+
+  <!-- One variable definition -->
+  <xsl:template match="tt:variable_definition">
+    <vardef>
+      <xsl:attribute name="name">
+        <xsl:value-of select="normalize-space(tt:name)"/>
+      </xsl:attribute>
+      <xsl:if test="normalize-space(tt:type)!=''">
+        <xsl:attribute name="type">
+          <xsl:value-of select="normalize-space(tt:type)"/>
+        </xsl:attribute>
+      </xsl:if>
+
+      <!-- normalize source into kind/value -->
+      <xsl:choose>
+        <xsl:when test="normalize-space(tt:source/tt:value/tt:const)!=''">
+          <xsl:attribute name="kind">const</xsl:attribute>
+          <xsl:attribute name="value">
+            <xsl:value-of select="normalize-space(tt:source/tt:value/tt:const)"/>
+          </xsl:attribute>
+        </xsl:when>
+        <xsl:when test="normalize-space(tt:source/tt:valuetable_entry)!=''">
+          <xsl:attribute name="kind">valuetable</xsl:attribute>
+          <xsl:attribute name="value">
+            <xsl:value-of select="normalize-space(tt:source/tt:valuetable_entry)"/>
+          </xsl:attribute>
+        </xsl:when>
+        <xsl:when test="normalize-space(tt:source/tt:variable)!=''">
+          <xsl:attribute name="kind">variable</xsl:attribute>
+          <xsl:attribute name="value">
+            <xsl:value-of select="normalize-space(tt:source/tt:variable)"/>
+          </xsl:attribute>
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:attribute name="kind">text</xsl:attribute>
+          <xsl:attribute name="value">
+            <xsl:value-of select="normalize-space(tt:source)"/>
+          </xsl:attribute>
+        </xsl:otherwise>
+      </xsl:choose>
+    </vardef>
+  </xsl:template>
+
     <!-- Fallback: mark unhandled nodes so we can see what's left -->
     <xsl:template match="*">
         <unknown tag="{local-name()}"/>
