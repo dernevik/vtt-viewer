@@ -58,8 +58,11 @@ $extractor = Compile-Xslt $extractXsl
 $inReader  = [System.Xml.XmlReader]::Create($src, $readerSettings)
 $intWriter = [System.Xml.XmlWriter]::Create($intPath, (New-Object System.Xml.XmlWriterSettings -Property @{ Indent = $true; Encoding = [Text.UTF8Encoding]::new($false) }))
 
+$extractArgs = New-Object System.Xml.Xsl.XsltArgumentList
+if ($Fixture) { $extractArgs.AddParam('fixture','', $Fixture) }
+
 try {
-  $extractor.Transform($inReader, $null, $intWriter)
+  $extractor.Transform($inReader, $extractArgs, $intWriter)
 } finally {
   if ($intWriter) { $intWriter.Close() }
   if ($inReader)  { $inReader.Close()  }
